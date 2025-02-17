@@ -1,0 +1,101 @@
+# Ignore Visual Studio and Rider IDE files
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build artifacts
+bin/
+obj/
+out/
+*.dll
+*.exe
+*.pdb
+*.log
+*.cache
+*.so
+*.idb
+*.aps
+*.ncb
+*.opendb
+*.tlog
+*.VC.db
+*.pidb
+
+# Packages
+*.nupkg
+*.snupkg
+packages/
+!packages/repositories.config
+
+# NuGet
+*.nuget/
+.nuget/
+project.lock.json
+project.assets.json
+Packages/
+Package/
+
+# Logs
+*.log
+logs/
+*.svclog
+
+# Application Insights
+ApplicationInsights.config
+ApplicationInsightsTelemetry.config
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.csproj.user
+
+# Azure Functions & AppSettings
+local.settings.json
+host.json
+*.azurefunctions/
+*.secrets.json
+
+# Rider
+.idea/
+
+# JetBrains Rider settings
+/.idea/
+*.sln.iml
+
+# Entity Framework Migrations
+Migrations/
+
+# Resharper files
+_ReSharper*/
+**/ReSharper/
+
+# ASP.NET
+appsettings.Development.json
+appsettings.Local.json
+appsettings.json
+appsettings.*.json
+secrets.json
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Static Files
+wwwroot/node_modules/
+wwwroot/lib/
+wwwroot/dist/
+
+# Node & npm related
+node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+launchSettings.json
+# Other IDEs
+Thumbs.db
+Desktop.ini
