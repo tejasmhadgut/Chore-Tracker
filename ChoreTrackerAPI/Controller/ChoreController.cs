@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 namespace ChoreTrackerAPI.Controller
 {
@@ -57,13 +58,32 @@ namespace ChoreTrackerAPI.Controller
             {
                 Name = choreDto.Name,
                 Description = choreDto.Description,
-                DueDate = choreDto.DueDate,
+                status = ChoreStatus.ToDo,
+                Recurrence = choreDto.RecurrenceType,
+                RecurrenceEndDate = choreDto.RecurrenceEndDate,
+                IntervalDays = choreDto.IntervalDays,
                 Group = group
             };
 
+            switch(choreDto.RecurrenceType)
+            {
+                case RecurrenceType.Daily:
+                    chore.NextOccurence = DateTime.UtcNow.AddDays(1);
+                    break;
+                case RecurrenceType.Weekly:
+                    chore.NextOccurence = DateTime.UtcNow.AddDays(7);
+                    break;
+                case RecurrenceType.Monthly:
+                    chore.NextOccurence = DateTime.UtcNow.AddMonths(1);
+                    break;
+                case RecurrenceType.Custom:
+                    chore.NextOccurence = DateTime.UtcNow.AddDays((double)choreDto.IntervalDays);
+                    break;
+            }
+
+
             _context.Chores.Add(chore);
             await _context.SaveChangesAsync();
-
             return Ok(new { Message = "Chore created successfully", ChoreId = chore.Id });
         }
         [Authorize]
@@ -101,7 +121,8 @@ namespace ChoreTrackerAPI.Controller
                                                 c.Id,
                                                 c.Name,
                                                 c.Description,
-                                                c.DueDate
+                                                c.Recurrence,
+                                                c.status
                                             }).ToListAsync();
 
             return Ok(chores);
@@ -123,12 +144,15 @@ namespace ChoreTrackerAPI.Controller
                 chore.Id,
                 chore.Name,
                 chore.Description,
-                chore.DueDate,
+                chore.Recurrence,
+                chore.IntervalDays,
+                chore.status,
                 GroupId = chore.Group.Id
             };
 
             return Ok(response);
         }
+
         [Authorize]
         [HttpPut("update/{choreId}")]
         public async Task<IActionResult> UpdateChore(int choreId, [FromBody] UpdateChoreDto choreDto)
@@ -162,7 +186,7 @@ namespace ChoreTrackerAPI.Controller
 
             chore.Name = choreDto.Name;
             chore.Description = choreDto.Description;
-            chore.DueDate = choreDto.DueDate;
+            chore.status = choreDto.status;
 
             _context.Chores.Update(chore);
             await _context.SaveChangesAsync();
@@ -246,6 +270,84 @@ namespace ChoreTrackerAPI.Controller
             await _context.SaveChangesAsync();
 
             return Ok("Chore marked as completed");
+        }
+
+        [Authorize]
+        [HttpPut("update-status/{choreId}")]
+        public async Task<IActionResult> UpdateChoreStatus(int choreId, [FromBody] ChoreStatus newStatus)
+        {
+            var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                return Unauthorized("User not authenticated");
+            }
+
+            var user = await _userManager.FindByEmailAsync(userEmail);
+            if (user == null)
+            {
+                return Unauthorized("User not found");
+            }
+
+            var chore = await _context.Chores.Include(c => c.Group)
+                                            .ThenInclude(g => g.Members)
+                                            .FirstOrDefaultAsync(c => c.Id == choreId);
+
+            if (chore == null)
+            {
+                return NotFound("Chore not found");
+            }
+
+            if (!chore.Group.Members.Any(m => m.UserId == user.Id))
+            {
+                return Forbid("You are not a member of this group");
+            }
+
+            chore.status = newStatus; // Update the status
+
+            _context.Chores.Update(chore);
+            await _context.SaveChangesAsync();
+
+            return Ok(new {Message = "Chore status updated successfully",ChoreId = chore.Id, NewStatus = newStatus});
+        }
+
+        [Authorize]
+        [HttpGet("group/{groupId}/status/{status}")]
+        public async Task<IActionResult> GetChoresByStatus(int groupId, ChoreStatus status)
+        {
+            var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                return Unauthorized("User not authenticated");
+            }
+
+            var user = await _userManager.FindByEmailAsync(userEmail);
+            if (user == null)
+            {
+                return Unauthorized("User not found");
+            }
+
+            var group = await _context.Groups.Include(g => g.Members)
+                                            .FirstOrDefaultAsync(g => g.Id == groupId);
+            if (group == null)
+            {
+                return NotFound("Group not found");
+            }
+
+            if (!group.Members.Any(m => m.UserId == user.Id))
+            {
+                return Forbid("You are not a member of this group");
+            }
+
+            var chores = await _context.Chores.Where(c => c.GroupId == groupId && c.status == status)
+                                            .Select(c => new
+                                            {
+                                                c.Id,
+                                                c.Name,
+                                                c.Description,
+                                                c.status
+                                            }).ToListAsync();
+
+            return Ok(chores);
         }
 
         [Authorize]

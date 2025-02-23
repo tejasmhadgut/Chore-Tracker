@@ -11,9 +11,12 @@ namespace ChoreTrackerAPI.Models
         public int Id {get; set;}
         public string Name {get; set;} = string.Empty;
         public string Description {get; set;} = string.Empty;
-        public DateTime DueDate {get; set;}
+        public RecurrenceType? Recurrence {get; set;}
+        public int? IntervalDays {get; set;}
+        public DateTime NextOccurence {get; set;}
+        public DateTime? RecurrenceEndDate {get; set;}
         public int GroupId {get; set;}
         public Group Group {get; set;}
-        public bool IsRecurring {get; set;} = true;
+        public ChoreStatus status {get; set;} = ChoreStatus.ToDo;
     }
 }

@@ -123,45 +123,58 @@ namespace ChoreTrackerAPI.Controller
         public async Task<IActionResult> GetGroupDetails(int groupId)
         {
             var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
-            if(string.IsNullOrEmpty(userEmail))
+            if (string.IsNullOrEmpty(userEmail))
             {
                 return Unauthorized("User not authenticated");
             }
 
             var user = await _userManager.FindByEmailAsync(userEmail);
-            if(user == null)
+            if (user == null)
             {
                 return Unauthorized("User not found");
             }
-            var group = await _context.Groups.Include(g => g.Members).ThenInclude(gm => gm.User).Include(g => g.Chores).FirstOrDefaultAsync(g=>g.Id==groupId);
-            if(group==null)
+
+            var group = await _context.Groups
+                .Include(g => g.Members).ThenInclude(gm => gm.User)
+                .Include(g => g.Chores)
+                .FirstOrDefaultAsync(g => g.Id == groupId);
+
+            if (group == null)
             {
                 return NotFound("Group not found");
             }
+
             var isMember = group.Members.Any(m => m.UserId == user.Id);
-            if(!isMember)
+            if (!isMember)
             {
                 return Forbid("User is not a member of this group");
             }
-            var response = new 
+
+            var response = new
             {
                 GroupId = group.Id,
                 Name = group.Name,
                 InviteCode = group.InviteCode,
-                Members = group.Members.Select(m => new{
+                Members = group.Members.Select(m => new
+                {
                     Id = m.User.Id,
                     Email = m.User.Email,
-                    Name = m.User.UserName
+                    Name = m.User.UserName // or any other member properties you want
                 }),
-                Chores = group.Chores.Select(c => new 
+                Chores = group.Chores.Select(c => new
                 {
                     Id = c.Id,
                     Name = c.Name,
                     Description = c.Description,
-                    DueDate = c.DueDate
-                })
+                    status = c.status,
+                    RecurrenceType = c.Recurrence,
+                    IntervalTypes = c.IntervalDays,
+                    NextOccurence = c.NextOccurence
+                    
+            })
             };
-            return Ok(Response);
+
+            return Ok(response); // Fixed this to use the correct object reference
         }
 
         [Authorize]
