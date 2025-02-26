@@ -5,9 +5,11 @@ using System.Threading.Tasks;
 using ChoreTrackerAPI.Data;
 using ChoreTrackerAPI.Dtos;
 using ChoreTrackerAPI.Models;
+using ChoreTrackerAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
@@ -19,10 +21,12 @@ namespace ChoreTrackerAPI.Controller
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<ApplicationUser> _userManager;
-        public ChoreController(ApplicationDbContext context, UserManager<ApplicationUser> userManager)
+        private readonly IHubContext<ChoreHubService> _choreHub;
+        public ChoreController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, IHubContext<ChoreHubService> choreHub)
         {
             _context = context;
             _userManager = userManager;
+            _choreHub = choreHub;
         }
 
         [Authorize]
@@ -84,6 +88,8 @@ namespace ChoreTrackerAPI.Controller
 
             _context.Chores.Add(chore);
             await _context.SaveChangesAsync();
+
+            await _choreHub.Clients.Group(choreDto.GroupId.ToString()).SendAsync("ChoreCreated",chore);
             return Ok(new { Message = "Chore created successfully", ChoreId = chore.Id });
         }
         [Authorize]
@@ -226,6 +232,7 @@ namespace ChoreTrackerAPI.Controller
 
             _context.Chores.Remove(chore);
             await _context.SaveChangesAsync();
+            await _choreHub.Clients.Group(chore.Group.Id.ToString()).SendAsync("ChoreDeleted", choreId);
 
             return Ok("Chore deleted successfully");
         }
@@ -306,6 +313,7 @@ namespace ChoreTrackerAPI.Controller
 
             _context.Chores.Update(chore);
             await _context.SaveChangesAsync();
+            await _choreHub.Clients.Group(chore.Group.Id.ToString()).SendAsync("ChoreUpdated", chore);
 
             return Ok(new {Message = "Chore status updated successfully",ChoreId = chore.Id, NewStatus = newStatus});
         }

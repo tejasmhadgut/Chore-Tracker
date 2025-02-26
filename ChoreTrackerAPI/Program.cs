@@ -18,6 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddOpenApi();
+builder.Services.AddSignalR();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
@@ -84,6 +85,8 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddHostedService<RecurrenceBackgroundService>();
+builder.Services.AddScoped<ChoreService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins", policy =>
@@ -107,10 +110,14 @@ app.UseCors(x => x
     .SetIsOriginAllowed(origin => true)
 );
 */
+app.UseRouting();
 app.UseCors("AllowSpecificOrigins");
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapHub<ChoreHubService>("/choreHub");
 app.MapControllers();
+
+
 // Swagger for development
 if (app.Environment.IsDevelopment())
 {
