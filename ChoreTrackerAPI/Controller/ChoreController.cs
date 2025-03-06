@@ -33,6 +33,16 @@ namespace ChoreTrackerAPI.Controller
         [HttpPost("create")]
         public async Task<IActionResult> CreateChore([FromBody] CreateChoreDto choreDto)
         {
+            var token = Request.Cookies["authToken"];
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                return Unauthorized("User not authenticated. Token is missing.");
+            }
+            
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
+
             var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
             if (string.IsNullOrEmpty(userEmail))
             {
@@ -92,10 +102,20 @@ namespace ChoreTrackerAPI.Controller
             await _choreHub.Clients.Group(choreDto.GroupId.ToString()).SendAsync("ChoreCreated",chore);
             return Ok(new { Message = "Chore created successfully", ChoreId = chore.Id });
         }
+        
         [Authorize]
         [HttpGet("group/{groupId}")]
         public async Task<IActionResult> GetChoresByGroup(int groupId)
         {
+            var token = Request.Cookies["authToken"];
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                return Unauthorized("User not authenticated. Token is missing.");
+            }
+            
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
             var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
             if (string.IsNullOrEmpty(userEmail))
             {
@@ -138,6 +158,15 @@ namespace ChoreTrackerAPI.Controller
         [HttpGet("{choreId}")]
         public async Task<IActionResult> GetChoreById(int choreId)
         {
+            var token = Request.Cookies["authToken"];
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                return Unauthorized("User not authenticated. Token is missing.");
+            }
+            
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
             var chore = await _context.Chores.Include(c => c.Group)
                                             .FirstOrDefaultAsync(c => c.Id == choreId);
             if (chore == null)
@@ -163,6 +192,15 @@ namespace ChoreTrackerAPI.Controller
         [HttpPut("update/{choreId}")]
         public async Task<IActionResult> UpdateChore(int choreId, [FromBody] UpdateChoreDto choreDto)
         {
+            var token = Request.Cookies["authToken"];
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                return Unauthorized("User not authenticated. Token is missing.");
+            }
+            
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
             var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
             if (string.IsNullOrEmpty(userEmail))
             {
@@ -193,7 +231,8 @@ namespace ChoreTrackerAPI.Controller
             chore.Name = choreDto.Name;
             chore.Description = choreDto.Description;
             chore.status = choreDto.status;
-
+            chore.Recurrence = choreDto.Recurrence;
+            chore.IntervalDays = choreDto.IntervalDays;
             _context.Chores.Update(chore);
             await _context.SaveChangesAsync();
 
@@ -204,6 +243,15 @@ namespace ChoreTrackerAPI.Controller
         [HttpDelete("delete/{choreId}")]
         public async Task<IActionResult> DeleteChore(int choreId)
         {
+            var token = Request.Cookies["authToken"];
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                return Unauthorized("User not authenticated. Token is missing.");
+            }
+            
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
             var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
             if (string.IsNullOrEmpty(userEmail))
             {
@@ -232,14 +280,24 @@ namespace ChoreTrackerAPI.Controller
 
             _context.Chores.Remove(chore);
             await _context.SaveChangesAsync();
-            await _choreHub.Clients.Group(chore.Group.Id.ToString()).SendAsync("ChoreDeleted", choreId);
+            await _choreHub.Clients.Group(chore.Group.Id.ToString()).SendAsync("ChoreDeleted", new { choreId = choreId});
 
             return Ok("Chore deleted successfully");
         }
+        
         [Authorize]
         [HttpPost("complete/{choreId}")]
         public async Task<IActionResult> CompleteChore(int choreId)
         {
+            var token = Request.Cookies["authToken"];
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                return Unauthorized("User not authenticated. Token is missing.");
+            }
+            
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
             var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
             if (string.IsNullOrEmpty(userEmail))
             {
@@ -283,6 +341,15 @@ namespace ChoreTrackerAPI.Controller
         [HttpPut("update-status/{choreId}")]
         public async Task<IActionResult> UpdateChoreStatus(int choreId, [FromBody] ChoreStatus newStatus)
         {
+            var token = Request.Cookies["authToken"];
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                return Unauthorized("User not authenticated. Token is missing.");
+            }
+            
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
             var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
             if (string.IsNullOrEmpty(userEmail))
             {
@@ -322,6 +389,15 @@ namespace ChoreTrackerAPI.Controller
         [HttpGet("group/{groupId}/status/{status}")]
         public async Task<IActionResult> GetChoresByStatus(int groupId, ChoreStatus status)
         {
+            var token = Request.Cookies["authToken"];
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                return Unauthorized("User not authenticated. Token is missing.");
+            }
+            
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
             var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
             if (string.IsNullOrEmpty(userEmail))
             {
@@ -362,6 +438,15 @@ namespace ChoreTrackerAPI.Controller
         [HttpGet("{groupId}/completed-chores")]
         public async Task<IActionResult> GetCompletedChores(int groupId, [FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
+            var token = Request.Cookies["authToken"];
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                return Unauthorized("User not authenticated. Token is missing.");
+            }
+            
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
             // Validate date range
             if (endDate < startDate)
             {

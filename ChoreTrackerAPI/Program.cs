@@ -15,13 +15,12 @@ using ChoreTrackerAPI.ServiceInterfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
 // Add services to the container
 builder.Services.AddOpenApi();
-builder.Services.AddSignalR();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.EnableSensitiveDataLogging();
 });
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
@@ -29,9 +28,19 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddDefaultTokenProviders();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+    .AddJwtBearer(options => {
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if(context.Request.Cookies.ContainsKey("authToken"))
+                {
+                    context.Token = context.Request.Cookies["authToken"];
+                }
+                return Task.CompletedTask;
+            }
+        };
+        options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
@@ -42,19 +51,34 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"]))
         };
     })
-.AddCookie()
-.AddGoogle(googleOptions =>
+    .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options => {
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.None;
+        options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Strict;
+        options.Cookie.Name = "authToken";
+    })
+    .AddGoogle(googleOptions =>
+    {
+        googleOptions.ClientId = builder.Configuration["Authentication:Google:ClientId"];
+        googleOptions.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+        googleOptions.CallbackPath = "/signin-google";
+    });
+builder.Services.ConfigureApplicationCookie(options =>
 {
-    googleOptions.ClientId = builder.Configuration["Authentication:Google:ClientId"];
-    googleOptions.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
-    googleOptions.CallbackPath = "/signin-google";
+    options.Cookie.HttpOnly = true;   // ✅ Makes token inaccessible to JavaScript
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;  // ✅ Only send over HTTPS
+    options.Cookie.SameSite = SameSiteMode.Strict;  // ✅ Prevent CSRF attacks
+    options.LoginPath = "/api/auth/login";
+    options.LogoutPath = "/api/auth/logout";
+    options.AccessDeniedPath = "/api/auth/access-denied";
+});
+builder.Services.AddControllers().AddNewtonsoftJson(options =>
+{
+    options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
 });
 
-builder.Services.AddControllers().AddNewtonsoftJson(Options => {
-    Options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore;
-});
 builder.Services.AddEndpointsApiExplorer();
-
+builder.Services.AddSignalR();
 builder.Services.AddSwaggerGen(c =>
 {
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -85,13 +109,16 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IChoreService, ChoreService>();
+
+// Add Hosted Service BEFORE app.Build()
 builder.Services.AddHostedService<RecurrenceBackgroundService>();
-builder.Services.AddScoped<ChoreService>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecificOrigins", policy =>
     {
-        policy.WithOrigins("http://localhost:5178") // Allow only your frontend
+        policy.WithOrigins("http://localhost:5175") // Allow only your frontend
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials(); // Allow cookies and credentials
@@ -101,22 +128,13 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Apply CORS policy before authentication
-/*
-app.UseCors(x => x
-    .AllowAnyHeader()
-    .AllowAnyMethod()
-    .AllowCredentials()
-    .WithOrigins("http://localhost:5178")
-    .SetIsOriginAllowed(origin => true)
-);
-*/
 app.UseRouting();
 app.UseCors("AllowSpecificOrigins");
 app.UseAuthentication();
+
 app.UseAuthorization();
 app.MapHub<ChoreHubService>("/choreHub");
 app.MapControllers();
-
 
 // Swagger for development
 if (app.Environment.IsDevelopment())
@@ -124,11 +142,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json","API V1");
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "API V1");
         options.RoutePrefix = string.Empty;
     });
 }
-
-
 
 app.Run();

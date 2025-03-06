@@ -12,5 +12,7 @@ namespace ChoreTrackerAPI.Dtos
         public string Description { get; set; }
         public DateTime DueDate { get; set; }
         public ChoreStatus status {get; set;} = ChoreStatus.ToDo;
+        public RecurrenceType? Recurrence {get; set;}
+        public int? IntervalDays {get; set;}
     }
 }

@@ -1,30 +1,32 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using ChoreTrackerAPI.Data;
 using ChoreTrackerAPI.ServiceInterfaces;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace ChoreTrackerAPI.Services
+public class RecurrenceBackgroundService : BackgroundService
 {
-    public class RecurrenceBackgroundService : BackgroundService
+    private readonly IServiceScopeFactory _serviceScopeFactory;
+
+    public RecurrenceBackgroundService(IServiceScopeFactory serviceScopeFactory)
     {
-        private readonly IServiceScopeFactory _serviceScopeFactory;
-        public RecurrenceBackgroundService(IServiceScopeFactory serviceScopeFactory,IChoreService choreService)
+        _serviceScopeFactory = serviceScopeFactory;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
         {
-            _serviceScopeFactory = serviceScopeFactory;
-        }
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-        {
-            while(!stoppingToken.IsCancellationRequested)
+            await Task.Delay(TimeSpan.FromDays(1), stoppingToken); // Avoid blocking the service.
+
+            using (var scope = _serviceScopeFactory.CreateScope())
             {
-                await Task.Delay(TimeSpan.FromDays(1),stoppingToken);
-                using (var scope = _serviceScopeFactory.CreateAsyncScope())
-                {
-                    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                    var ChoreService = scope.ServiceProvider.GetRequiredService<IChoreService>();
-                    await ChoreService.UpdateRecurrenceDatesAsync();
-                }
+                var choreService = scope.ServiceProvider.GetRequiredService<IChoreService>();
+
+                // Call the chore service within the scope.
+                await choreService.UpdateRecurrenceDatesAsync();
             }
         }
     }

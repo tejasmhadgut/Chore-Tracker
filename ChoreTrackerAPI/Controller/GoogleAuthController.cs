@@ -4,7 +4,10 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using ChoreTrackerAPI.Models;
+using ChoreTrackerAPI.ServiceInterfaces;
+using ChoreTrackerAPI.Services;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.CookiePolicy;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,16 +19,18 @@ namespace ChoreTrackerAPI.Controller
     {
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly UserManager<ApplicationUser> _userManager;
-        public GoogleAuthController(SignInManager<ApplicationUser> signInManager, UserManager<ApplicationUser> userManager)
+        private readonly IJwtTokenService _jwtTokenService;
+        public GoogleAuthController(SignInManager<ApplicationUser> signInManager, UserManager<ApplicationUser> userManager, JwtTokenService jwtTokenService)
         {
             _signInManager = signInManager;
             _userManager = userManager;
+            _jwtTokenService = jwtTokenService;
         }
 
         [HttpGet("google_login")]
         public IActionResult GoogleLogin()
         {
-            var redirectUrl = Url.Action(nameof(GoogleResponse), "ExternalAuth");
+            var redirectUrl = Url.Action(nameof(GoogleResponse), "GoogleAuth");
             var properties = _signInManager.ConfigureExternalAuthenticationProperties(GoogleDefaults.AuthenticationScheme, redirectUrl);
             return Challenge(properties, GoogleDefaults.AuthenticationScheme);
         }
@@ -46,12 +51,25 @@ namespace ChoreTrackerAPI.Controller
                     Email = info.Principal.FindFirstValue(ClaimTypes.Email)
                 };
 
-                await _userManager.CreateAsync(user);
+                var createResult = await _userManager.CreateAsync(user);
+                if (!createResult.Succeeded)
+                {
+                    return BadRequest(new { message = "User creation failed", errors = createResult.Errors });
+                }
                 await _userManager.AddLoginAsync(user, info);
             }
 
             await _signInManager.SignInAsync(user, isPersistent: false);
-            return Ok(new { message = "Google login successful", user.Email });
+
+            var token = _jwtTokenService.GenerateJwtToken(user);
+            Response.Cookies.Append("authToken", token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddDays(7)
+            });
+            return Ok(new { message = "Google login successful", token });
         }
     }
 }

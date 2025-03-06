@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 
 namespace ChoreTrackerAPI.Dtos
 {
-    public class GroupJoinRequest
+    public class GetGroupDto
     {
-        public int groupId {get;set;}
+        public string InviteCode {get;set;}
     }
 }

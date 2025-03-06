@@ -6,11 +6,12 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using ChoreTrackerAPI.Models;
+using ChoreTrackerAPI.ServiceInterfaces;
 using Microsoft.IdentityModel.Tokens;
 
 namespace ChoreTrackerAPI.Services
 {
-    public class JwtTokenService
+    public class JwtTokenService: IJwtTokenService
     {
         private readonly IConfiguration _configuration;
         public JwtTokenService(IConfiguration configuration)

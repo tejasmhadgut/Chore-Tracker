@@ -31,20 +31,30 @@ namespace ChoreTrackerAPI.Controller
         {
             if(!ModelState.IsValid)
                 return BadRequest(ModelState);
-
+            Console.WriteLine("running til here");
             var user = new ApplicationUser{
-                UserName = model.UserName, Email = model.Email, FirstName = model.FirstName, LastName = model.LastName
-        };
+                UserName = model.UserName.ToLower(), Email = model.Email, FirstName = model.FirstName, LastName = model.LastName
+                };
             var result = await _userManager.CreateAsync(user, model.Password);
             if(!result.Succeeded)
                 return BadRequest(result.Errors);
-            
+            var token = _jwtTokenService.GenerateJwtToken(user);
+
+            // Store token in HttpOnly Cookie
+            Response.Cookies.Append("authToken", token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = false,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddDays(7)
+            });
+
             return Ok(new { message = "User registered successfully!"});
         }
-        [HttpPost("Login")]
+        [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginModel model)
         {
-            var user = await _userManager.FindByNameAsync(model.UserName);
+            var user = await _userManager.FindByNameAsync(model.UserName.ToLower());
             if(user == null)
                 return Unauthorized(new {message = "Invalid username or password"});
             
@@ -53,7 +63,20 @@ namespace ChoreTrackerAPI.Controller
                 return Unauthorized(new {message = "Invalid username or password"});
 
             var token = _jwtTokenService.GenerateJwtToken(user);
-            return Ok( new {token});
+
+            Response.Cookies.Append("authToken", token, new CookieOptions{
+                HttpOnly = true,
+                Secure = false,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddDays(7)
+            });
+            return Ok(new { message = "Login successful" });
+        }
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            Response.Cookies.Delete("authToken");
+            return Ok(new {message = "Logged Out Successfully!"});
         }
         [Authorize]
         [HttpGet("users/{username}")]

@@ -14,6 +14,7 @@ namespace ChoreTrackerAPI.Data
         {
             
         }
+        
         public DbSet<Chore> Chores {get;set;}
         public DbSet<ChoreCompletion> ChoreCompletion {get;set;}
         public DbSet<Group> Groups {get;set;}

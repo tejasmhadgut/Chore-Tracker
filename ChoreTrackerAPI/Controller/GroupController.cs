@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using ChoreTrackerAPI.Data;
 using ChoreTrackerAPI.Dtos;
 using ChoreTrackerAPI.Models;
 using ChoreTrackerAPI.ServiceInterfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -67,6 +69,61 @@ namespace ChoreTrackerAPI.Controller
             return Ok(new {GroupId = group.Id, InviteCode = group.InviteCode});
             
         }
+        [Authorize]
+        [HttpPost("get-group")]
+        public async Task<IActionResult> GetGroupByInviteCode([FromBody] GetGroupDto request)
+        {
+            Console.WriteLine(request.InviteCode);
+
+            var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                Console.WriteLine("User not authenticated");
+                return Unauthorized("User not authenticated");
+            }
+
+            var user = await _userManager.FindByEmailAsync(userEmail);
+            if (user == null)
+            {
+                Console.WriteLine("User not found");
+                return Unauthorized("User not found");
+            }
+
+            var group = await _context.Groups
+                .Include(g => g.Members)
+                .ThenInclude(m => m.User)  // Ensure User is included
+                .FirstOrDefaultAsync(g => g.InviteCode == request.InviteCode);
+
+            if (group == null)
+            {
+                Console.WriteLine("Group not found");
+                return NotFound("Group not found");
+            }
+
+            var existingUser = await _context.GroupMember
+                .FirstOrDefaultAsync(gm => gm.UserId == user.Id && gm.GroupId == group.Id);
+    
+            if (existingUser != null)
+            {
+                Console.WriteLine($"User {existingUser.UserId} is already a member of group {existingUser.GroupId}");
+                return BadRequest("User is already a member of this group");
+            }
+
+            // Ensure Members and Users are not null
+            var memberNames = group.Members
+            .Where(m => m.User != null)  // Avoid null User
+            .Select(m => $"{m.User.FirstName} {m.User.LastName}")
+            .ToList();
+
+            return Ok(new
+            {
+                group.Id,
+                group.Name,
+                group.Description,
+                group.createdAt,
+                MemberNames = memberNames
+            });
+        }
 
         [Authorize]
         [HttpPost("join")]
@@ -75,22 +132,26 @@ namespace ChoreTrackerAPI.Controller
             var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
             if(string.IsNullOrEmpty(userEmail))
             {
+                 Console.WriteLine("User not authenticated");
                 return Unauthorized("User not authenticated");
             }
             var user = await _userManager.FindByEmailAsync(userEmail);
             if(user==null)
             {
+                Console.WriteLine("User not found");
                 return Unauthorized("User not found");
             }
-            var group = await _context.Groups.Include(g => g.Members).FirstOrDefaultAsync(g => g.InviteCode == request.InviteCode);
+            var group = await _context.Groups.Include(g => g.Members).FirstOrDefaultAsync(g => g.Id == request.groupId);
             if(group == null)
             {
+                Console.WriteLine("We dont have group");
                 return NotFound("Group not found");
             }
-
+            Console.WriteLine("already in now group");
             var existingUser = await _context.GroupMember.FirstOrDefaultAsync(gm => gm.UserId == user.Id && gm.GroupId == group.Id);
             if(existingUser != null)
             {
+                Console.WriteLine("already in group");
                 return BadRequest("User is already a member of this group");
             }
             var groupMember = new GroupMember {User = user, Group = group};
@@ -103,18 +164,41 @@ namespace ChoreTrackerAPI.Controller
         [HttpGet("my-groups")]
         public async Task<IActionResult> GetUserGroups()
         {
+            var token = Request.Cookies["authToken"];
+            
+            if (string.IsNullOrEmpty(token))
+            {
+                return Unauthorized("User not authenticated. Token is missing.");
+            }
+            
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
+            //var userEmail = jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+            
             var userEmail = User.Claims.FirstOrDefault(c => c.Type == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
+            Console.WriteLine(userEmail);
             if(string.IsNullOrEmpty(userEmail))
             {
                 return Unauthorized("User not authenticated");
             }
+            Console.WriteLine("email here"+userEmail);
 
             var user = await _userManager.FindByEmailAsync(userEmail);
             if (user == null)
             {   
                 return Unauthorized("User not found");
             }
-            var groups = await _context.GroupMember.Where(gm => gm.UserId == user.Id).Include(gm => gm.Group).Select(gm=>gm.Group).ToListAsync();
+            var groups = await _context.GroupMember.Where(gm => gm.UserId == user.Id).Include(gm => gm.Group).ThenInclude(g=>g.Members).Select(gm=>
+            new GroupDto 
+            {
+                Id = gm.Group.Id,
+                Name = gm.Group.Name,
+                Description = gm.Group.Description,
+                CreatedAt = gm.Group.createdAt,
+                MemberNames = gm.Group.Members.Select(m=>$"{m.User.FirstName} {m.User.LastName}").ToList()
+            }
+            ).ToListAsync();
+            Console.WriteLine(groups);
             return Ok(groups);
         }
 
