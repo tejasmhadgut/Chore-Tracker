@@ -1,6 +1,19 @@
 # ChoreTrack
 
-A multi-tenant household task management platform built for distributed, high-throughput operation. Groups of users can assign recurring chores, track completion on a Kanban board, and receive real-time notifications across horizontally scaled API instances.
+A household task management platform where groups can assign chores, track completion on a Kanban board, and receive real-time notifications.
+
+The project evolved into a distributed system to explore caching, messaging, horizontal scaling, and database replication in a practical context.
+
+## Why I Built This
+
+Most task management projects stop at CRUD. I used ChoreTrack as a vehicle to work through production-oriented backend problems:
+
+- How do you keep a cache consistent when multiple API pods are writing to the same database?
+- How do you deliver real-time notifications to a user when any pod might handle their WebSocket connection?
+- When does connection pooling help, and when does it hurt?
+- What does horizontal scaling actually look like under load?
+
+These aren't problems you run into until you try to run the same app on more than one server.
 
 ## Architecture
 
@@ -33,14 +46,11 @@ A multi-tenant household task management platform built for distributed, high-th
     └─────────────┘ └─────────────┘   └────────────────────┘   └──────────────────┘
 ```
 
-- **Nginx** load balances across API pods using `least_conn`
-- **L1 cache** (`IMemoryCache`) lives inside each pod — sub-millisecond, no network hop
-- **Redis** serves as L2 cache (shared across pods) and SignalR backplane (ensures real-time notifications reach users regardless of which pod handles their connection)
-- **PgBouncer** pools database connections — prevents connection exhaustion when pods scale out (Kubernetes only)
-- **PostgreSQL read replica** via streaming replication offloads all read traffic from the primary
-- **RabbitMQ** handles async event fan-out: chore assignments, cache invalidation, email delivery
-- **Hangfire worker pod** runs background jobs (recurring chore generation, cleanup) isolated from the request-handling pods
-- **PgBouncer** pools database connections in Kubernetes to prevent connection exhaustion at scale
+- **L1 + L2 caching** — each pod has an in-process `IMemoryCache` (no network hop); Redis is the shared L2 layer and also the SignalR backplane so notifications reach users regardless of which pod holds their connection
+- **PgBouncer** — pools database connections in Kubernetes to prevent exhaustion when pods scale out
+- **PostgreSQL read replica** — streaming replication; all reads routed to replica, writes to primary
+- **RabbitMQ** — async fan-out for chore events, cache invalidation, and email delivery
+- **Hangfire worker pod** — background job scheduling isolated from the request-handling pods
 
 ## Performance
 
@@ -51,7 +61,8 @@ A multi-tenant household task management platform built for distributed, high-th
 | p95 latency | >10s | **~800ms** |
 | Chore query latency | 9.9ms | **0.8ms (12×)** |
 
-Optimizations applied:
+Benchmarks collected using [k6](https://k6.io) against a Kubernetes deployment running 2 API replicas. Optimizations applied:
+
 - Two-tier caching: L1 `IMemoryCache` (per-pod) + L2 Redis (shared)
 - 4 composite indexes identified via `EXPLAIN ANALYZE` on hot query paths
 - PostgreSQL streaming read replica for read/write separation
@@ -88,7 +99,7 @@ cd Chore-Tracker
 Copy and configure environment:
 ```bash
 cp ChoreTrackerAPI/appsettings.json ChoreTrackerAPI/appsettings.Local.json
-# Edit appsettings.Local.json and fill in JWT SecretKey and any optional services
+# Fill in JWT:SecretKey (required) and any optional service keys
 ```
 
 Start the stack:
@@ -132,14 +143,14 @@ kubectl port-forward svc/choretrack-nginx 8080:80 -n choretrack
 
 ## Configuration
 
-| Key | Description |
-|-----|-------------|
-| `JWT:SecretKey` | Required. Min 32 chars, used to sign auth tokens |
-| `Authentication:Google:ClientId/Secret` | Optional. Enables Google OAuth login |
-| `SendGrid:ApiKey` | Optional. Enables invite email delivery |
-| `AWS:S3:ProfilePictureBucket` | Optional. Enables avatar uploads |
+**Required:** PostgreSQL, Redis, RabbitMQ connection strings + JWT secret key
 
-All connection strings for Redis, RabbitMQ, and PostgreSQL are configured via `ConnectionStrings` in `appsettings.json` or injected as environment variables in Docker/Kubernetes.
+**Optional:**
+- Google OAuth (`Authentication:Google:ClientId/Secret`) — enables social login
+- SendGrid (`SendGrid:ApiKey`) — enables invite emails
+- AWS S3 (`AWS:S3:ProfilePictureBucket`) — enables avatar uploads
+
+All values go in `appsettings.Local.json` locally or as environment variables in Docker/Kubernetes.
 
 ## Project Structure
 
