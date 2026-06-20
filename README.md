@@ -1,47 +1,160 @@
-# ChoreTracker
+# ChoreTrack
 
-Is the Project Complete?
-Functionally: YES ✓
-The application is feature-complete with impressive implementation:
+A multi-tenant household task management platform built for distributed, high-throughput operation. Groups of users can assign recurring chores, track completion on a Kanban board, and receive real-time notifications across horizontally scaled API instances.
 
-Full authentication system (JWT + Google OAuth)
-Complete chore management with kanban board
-Group collaboration with invite codes
-Real-time updates via SignalR
-Comprehensive analytics dashboard
-File uploads with AWS S3
-Recurring task automation
-Modern distributed architecture (Redis caching, rate limiting)
-Production-Ready: NOT YET ✗
+## Architecture
 
-Critical Gaps Found:
-1. No Tests (Most Critical)
-Zero unit tests, integration tests, or E2E tests
-No testing frameworks installed
-This is the biggest gap for a professional portfolio project
-2. No Containerization
-No Docker or docker-compose configuration
-Makes deployment and local setup more difficult
-3. No CI/CD Pipeline
-No automated build/test/deploy
-No GitHub Actions, GitLab CI, or similar
-4. Security Issues
-Hardcoded secrets in appsettings.json
-Should use environment variables or secret management
-5. Minimal Root Documentation
-README.md only has one line
-Missing setup instructions, prerequisites, architecture overview
-Strengths:
-Clean, professional code (no TODO comments)
-Excellent technical documentation (PROJECT_REPORT.md is 1,749 lines!)
-Modern stack (.NET 9, React 19, PostgreSQL, Redis)
-Sophisticated patterns (CQRS, distributed caching, real-time)
-My Recommendation:
-For a portfolio/resume project, you should add testing as the minimum requirement. Would you like me to help you:
+```
+                        ┌─────────────────────────────────────────┐
+                        │              Nginx (least_conn)          │
+                        └──────────┬──────────────┬───────────────┘
+                                   │              │
+                    ┌──────────────▼──┐      ┌───▼─────────────┐
+                    │   API Pod 1     │      │   API Pod 2      │
+                    │  (.NET Core)    │      │  (.NET Core)     │
+                    └──────┬──────────┘      └────────┬─────────┘
+                           │                          │
+          ┌────────────────┼──────────────────────────┼──────────────┐
+          │                │                          │              │
+    ┌─────▼──────┐  ┌──────▼──────┐  ┌───────────────▼──┐  ┌───────▼──────┐
+    │ PostgreSQL │  │  PG Replica │  │   Redis           │  │  RabbitMQ    │
+    │ (primary)  │  │  (reads)    │  │   L2 cache +      │  │  async events│
+    └────────────┘  └─────────────┘  │   SignalR backplane│  └──────────────┘
+                                     └───────────────────┘
+```
 
-Add testing infrastructure (unit tests, integration tests)?
-Set up Docker for easy deployment?
-Create a comprehensive root README with setup instructions?
-Fix security issues (move secrets to environment variables)?
-Set up a CI/CD pipeline?
-Which of these would be most valuable for you?
+- **Nginx** load balances across API pods using `least_conn`
+- **Redis** serves as both L2 cache and SignalR backplane (ensures real-time notifications reach users regardless of which pod handles their connection)
+- **PostgreSQL read replica** via streaming replication offloads read traffic from primary
+- **RabbitMQ** handles async event fan-out (chore assignments, cache invalidation, email notifications)
+- **Hangfire** schedules recurring chore generation on a dedicated worker pod
+- **PgBouncer** pools database connections in Kubernetes to prevent connection exhaustion at scale
+
+## Performance
+
+| Metric | Baseline | Optimized |
+|--------|----------|-----------|
+| Throughput | ~46 req/s | **305 req/s (6.6×)** |
+| p50 latency | ~300ms | **46ms** |
+| p95 latency | >10s | **~800ms** |
+| Chore query latency | 9.9ms | **0.8ms (12×)** |
+
+Optimizations applied:
+- Two-tier caching: L1 `IMemoryCache` (per-pod) + L2 Redis (shared)
+- 4 composite indexes identified via `EXPLAIN ANALYZE` on hot query paths
+- PostgreSQL streaming read replica for read/write separation
+- Kubernetes HPA demonstrated 2 → 7 replica scale-out at 148% CPU under load
+
+## Features
+
+- **Group management** — create groups, invite members via invite codes
+- **Chore tracking** — assign chores with difficulty ratings, due dates, recurrence schedules
+- **Kanban board** — drag-and-drop task management with real-time sync across users
+- **Real-time notifications** — SignalR push notifications across all connected pods
+- **Analytics dashboard** — completion heatmaps, leaderboards, contribution charts, timeline views
+- **Recurring automation** — Hangfire background jobs generate next occurrences on completion
+- **Authentication** — JWT cookie auth + Google OAuth
+- **Profile management** — avatars via AWS S3
+
+## Tech Stack
+
+**Backend:** C#, .NET Core, Entity Framework Core, SignalR, Hangfire, MassTransit  
+**Frontend:** React, TypeScript, Vite  
+**Data:** PostgreSQL 16, Redis 7  
+**Messaging:** RabbitMQ  
+**Infrastructure:** Docker, Docker Compose, Kubernetes, Nginx, PgBouncer
+
+## Quick Start (Docker Compose)
+
+**Prerequisites:** Docker, Docker Compose
+
+```bash
+git clone https://github.com/tejasmhadgut/Chore-Tracker.git
+cd Chore-Tracker
+```
+
+Copy and configure environment:
+```bash
+cp ChoreTrackerAPI/appsettings.json ChoreTrackerAPI/appsettings.Local.json
+# Edit appsettings.Local.json and fill in JWT SecretKey and any optional services
+```
+
+Start the stack:
+```bash
+docker-compose up --build
+```
+
+| Service | URL |
+|---------|-----|
+| API + Frontend | http://localhost:8080 |
+| Frontend (dev) | http://localhost:3000 |
+| RabbitMQ Management | http://localhost:15672 (guest/guest) |
+
+To seed sample data:
+```bash
+./populate.sh
+# Username: testuser  Password: TestPassword1@
+```
+
+## Kubernetes Deployment
+
+**Prerequisites:** kubectl, a running cluster (k3d, minikube, etc.)
+
+```bash
+# Build and load the API image
+docker build -t choretrack-api:latest ./ChoreTrackerAPI
+# For k3d: k3d image import choretrack-api:latest -c <cluster-name>
+
+# Configure secrets
+cp k8s/secrets.yaml k8s/secrets.local.yaml
+# Edit k8s/secrets.local.yaml with real connection strings and passwords
+
+# Deploy
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/secrets.local.yaml
+kubectl apply -f k8s/
+
+# Access
+kubectl port-forward svc/choretrack-nginx 8080:80 -n choretrack
+```
+
+## Configuration
+
+| Key | Description |
+|-----|-------------|
+| `JWT:SecretKey` | Required. Min 32 chars, used to sign auth tokens |
+| `Authentication:Google:ClientId/Secret` | Optional. Enables Google OAuth login |
+| `SendGrid:ApiKey` | Optional. Enables invite email delivery |
+| `AWS:S3:ProfilePictureBucket` | Optional. Enables avatar uploads |
+
+All connection strings for Redis, RabbitMQ, and PostgreSQL are configured via `ConnectionStrings` in `appsettings.json` or injected as environment variables in Docker/Kubernetes.
+
+## Project Structure
+
+```
+ChoreTrackerAPI/
+├── BackgroundJobs/       # Hangfire job definitions
+├── Configuration/        # Rate limiting, auth filters
+├── Consumers/            # RabbitMQ message consumers
+├── Controller/           # REST API endpoints
+├── CQRS/                 # Commands, queries, handlers
+├── Data/                 # EF Core DbContext (primary + read-only)
+├── Messages/             # RabbitMQ event/command contracts
+├── Migrations/           # EF Core schema migrations
+├── Models/               # Domain entities
+├── ServiceInterfaces/    # Abstractions
+├── Services/             # Business logic
+frontend/
+├── src/components/       # React components
+├── src/pages/            # Route-level pages
+├── src/services/         # API client layer
+├── src/context/          # Auth, notifications, group context
+k8s/                      # Kubernetes manifests
+├── api.yaml              # Deployment + HPA
+├── postgres.yaml         # StatefulSet with streaming replica
+├── pgbouncer.yaml        # Connection pooler
+├── redis.yaml            # Cache + SignalR backplane
+├── rabbitmq.yaml         # Message broker
+nginx.conf                # Load balancer config
+docker-compose.yml        # Full local stack
+```
