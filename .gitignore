@@ -67,24 +67,29 @@ host.json
 /.idea/
 *.sln.iml
 
-# Entity Framework Migrations
-Migrations/
-
 # Resharper files
 _ReSharper*/
 **/ReSharper/
 
 # ASP.NET
-appsettings.Development.json
 appsettings.Local.json
-appsettings.json
-appsettings.*.json
 secrets.json
 
 # Docker
 docker-compose.override.yml
 .dockerignore
 
+# Claude Code AI session files
+.claude/
+
+# Archive/dead code
+ChoreTrackerAPI/Services/_archive/
+
+# Frontend env (keep .env.example only)
+frontend/.env
+*.md
+MEMBER_PROFILE_FIX_SUMMARY.md
+!README.md
 # Static Files
 wwwroot/node_modules/
 wwwroot/lib/
