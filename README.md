@@ -5,29 +5,41 @@ A multi-tenant household task management platform built for distributed, high-th
 ## Architecture
 
 ```
-                        ┌─────────────────────────────────────────┐
-                        │              Nginx (least_conn)          │
-                        └──────────┬──────────────┬───────────────┘
-                                   │              │
-                    ┌──────────────▼──┐      ┌───▼─────────────┐
-                    │   API Pod 1     │      │   API Pod 2      │
-                    │  (.NET Core)    │      │  (.NET Core)     │
-                    └──────┬──────────┘      └────────┬─────────┘
-                           │                          │
-          ┌────────────────┼──────────────────────────┼──────────────┐
-          │                │                          │              │
-    ┌─────▼──────┐  ┌──────▼──────┐  ┌───────────────▼──┐  ┌───────▼──────┐
-    │ PostgreSQL │  │  PG Replica │  │   Redis           │  │  RabbitMQ    │
-    │ (primary)  │  │  (reads)    │  │   L2 cache +      │  │  async events│
-    └────────────┘  └─────────────┘  │   SignalR backplane│  └──────────────┘
-                                     └───────────────────┘
+              [Browser]
+                  │
+          [React Frontend]
+                  │
+                  ▼
+      ┌─────────────────────┐
+      │   Nginx (least_conn) │
+      └────────┬─────┬───────┘
+               │     │
+       ┌───────▼─┐ ┌─▼────────┐     ┌─────────────────┐
+       │ API Pod 1│ │ API Pod 2│     │  API Worker Pod  │
+       │ L1 Cache │ │ L1 Cache │     │  (Hangfire jobs) │
+       └────┬─────┘ └────┬─────┘     └────────┬─────────┘
+            │            │                    │
+            └─────┬───────┘                   │
+                  │                           │
+       ┌──────────▼──────────┐                │
+       │      PgBouncer       │◄───────────────┘
+       │  (connection pool)   │
+       └──────┬───────┬───────┘
+              │       │
+    ┌─────────▼──┐ ┌──▼──────────┐   ┌────────────────────┐   ┌──────────────────┐
+    │ PostgreSQL  │ │ PG Replica  │   │ Redis              │   │ RabbitMQ         │
+    │ (writes)    │ │ (reads)     │   │ L2 cache +         │   │ chore events,    │
+    │  streaming──►│             │   │ SignalR backplane   │   │ cache invalidation│
+    └─────────────┘ └─────────────┘   └────────────────────┘   └──────────────────┘
 ```
 
 - **Nginx** load balances across API pods using `least_conn`
-- **Redis** serves as both L2 cache and SignalR backplane (ensures real-time notifications reach users regardless of which pod handles their connection)
-- **PostgreSQL read replica** via streaming replication offloads read traffic from primary
-- **RabbitMQ** handles async event fan-out (chore assignments, cache invalidation, email notifications)
-- **Hangfire** schedules recurring chore generation on a dedicated worker pod
+- **L1 cache** (`IMemoryCache`) lives inside each pod — sub-millisecond, no network hop
+- **Redis** serves as L2 cache (shared across pods) and SignalR backplane (ensures real-time notifications reach users regardless of which pod handles their connection)
+- **PgBouncer** pools database connections — prevents connection exhaustion when pods scale out (Kubernetes only)
+- **PostgreSQL read replica** via streaming replication offloads all read traffic from the primary
+- **RabbitMQ** handles async event fan-out: chore assignments, cache invalidation, email delivery
+- **Hangfire worker pod** runs background jobs (recurring chore generation, cleanup) isolated from the request-handling pods
 - **PgBouncer** pools database connections in Kubernetes to prevent connection exhaustion at scale
 
 ## Performance
