@@ -6,6 +6,7 @@ const GroupCursor = ({ position }: { position: Position }) => {
   return (
     <motion.div
       animate={{
+        top: position.top,
         left: position.left,
         width: position.width,
         height: position.height,
@@ -16,7 +17,7 @@ const GroupCursor = ({ position }: { position: Position }) => {
         stiffness: 200,
         damping: 20,
       }}
-      className="absolute bg-gray-300 rounded-lg shadow-lg -z-1"
+      className="absolute bg-white rounded-lg shadow-lg -z-1"
     />
   );
 };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+/*import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 
 export default function JoinGroup() {
@@ -13,7 +13,7 @@ export default function JoinGroup() {
     <div className="flex flex-col items-center">
       <h3 className="mb-4">Please Enter your invitation code.</h3>
       <div className="flex items-center border border-gray-300 rounded-full overflow-hidden shadow-md w-full max-w-md mb-4">
-        {/* Search Input */}
+        
         <input
           type="text"
           className="flex-1 px-10 py-2 outline-none bg-white rounded-l-full"
@@ -23,7 +23,6 @@ export default function JoinGroup() {
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
         />
 
-        {/* Join Group Button */}
         <div
           onClick={handleSubmit}
           className="w-[124px] h-[40px] flex items-center justify-center"
@@ -35,10 +34,7 @@ export default function JoinGroup() {
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
-            {/* Button Text */}
             
-
-            {/* Icon visible on hover */}
             <ArrowRight
               className="w-4 h-4 text-white ml-2 opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100"
             />
@@ -48,3 +44,4 @@ export default function JoinGroup() {
     </div>
   );
 }
+*/

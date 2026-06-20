@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: choretrack-api
+  namespace: choretrack
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: choretrack-api
+  template:
+    metadata:
+      labels:
+        app: choretrack-api
+    spec:
+      containers:
+        - name: api
+          image: choretrack-api:latest
+          imagePullPolicy: Never   # use locally loaded image
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: choretrack-config
+          env:
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: choretrack-db-secret
+                  key: primary-url
+            - name: ConnectionStrings__ReadonlyConnection
+              valueFrom:
+                secretKeyRef:
+                  name: choretrack-db-secret
+                  key: replica-url
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: choretrack-api
+  namespace: choretrack
+spec:
+  selector:
+    app: choretrack-api
+  ports:
+    - port: 5000
+      targetPort: 5000
+---
+# Horizontal Pod Autoscaler — scales API pods based on CPU utilization
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: choretrack-api-hpa
+  namespace: choretrack
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: choretrack-api
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+---
+# Background worker — one replica, handles Hangfire jobs and MassTransit consumers
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: choretrack-worker
+  namespace: choretrack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: choretrack-worker
+  template:
+    metadata:
+      labels:
+        app: choretrack-worker
+    spec:
+      containers:
+        - name: worker
+          image: choretrack-api:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: choretrack-worker-config
+          env:
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: choretrack-db-secret
+                  key: primary-url
+            - name: ConnectionStrings__ReadonlyConnection
+              valueFrom:
+                secretKeyRef:
+                  name: choretrack-db-secret
+                  key: replica-url
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

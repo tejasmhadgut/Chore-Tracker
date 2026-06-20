@@ -1,9 +1,10 @@
-import React from 'react'; // API call to join group
+/*import React from 'react'; // API call to join group
 import { Group } from '../types/types';
 import { handleJoin } from '../../services/GroupService';
 
 type InvitationCardProps = {
     group: Group;
+    onGroupJoined?: (groupId: number) => void;
 };
 
 const InvitationCard: React.FC<InvitationCardProps> = ({ group }) => {
@@ -11,6 +12,9 @@ const InvitationCard: React.FC<InvitationCardProps> = ({ group }) => {
         try {
             await handleJoin(group.id);
             alert("You have joined the group successfully!");
+            if(onGroupJoined){
+                onGroupJoined(group.id);
+            }
         } catch (error) {
             alert(error instanceof Error ? error.message : "Error joining group");
         }
@@ -41,3 +45,4 @@ const InvitationCard: React.FC<InvitationCardProps> = ({ group }) => {
 };
 
 export default InvitationCard;
+*/

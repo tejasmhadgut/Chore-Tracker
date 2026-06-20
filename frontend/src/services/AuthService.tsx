@@ -1,17 +1,35 @@
 import axios from "axios";
+import { axiosInstance } from './axiosConfig';
 
 interface LoginResponse {
-    token: string;
-}
+    message: string;
+    user: {
+        firstName: string;
+        lastName: string;
+        userName: string;
+        email: string;
+        profilePictureUrl: string | null;
+    };
+};
 
 interface RegisterResponse {
     message: string;
+    user: {
+        firstName: string;
+        lastName: string;
+        userName: string;
+        email: string;
+        profilePictureUrl: string | null;
+    };
+    token: string;
 }
-const API_URL = 'http://localhost:5178/api/account';
 
 export const login = async (userName: string, password: string): Promise<LoginResponse> => {
     try {
-        const response = await axios.post(`${API_URL}/login`,{UserName: userName,Password: password},{withCredentials:true});
+        const response = await axiosInstance.post('/api/account/login', {
+            UserName: userName,
+            Password: password
+        });
         return response.data;
     } catch (error: unknown) {
         if(axios.isAxiosError(error) && error.response)
@@ -22,9 +40,7 @@ export const login = async (userName: string, password: string): Promise<LoginRe
         } else {
             throw new Error("Unknown Error")
         }
-        
     }
-
 };
 
 export const register = async (
@@ -35,16 +51,20 @@ export const register = async (
     lastName: string
 ): Promise<RegisterResponse> => {
     try {
-        const payload = { userName, email, password, firstName, lastName };
-        console.log("Registering user with data:", payload); // Log request payload
-        const response = await axios.post(`${API_URL}/register`,{userName: userName.toLowerCase(),email,password,firstName,lastName},{withCredentials:true});
-        return response.data
+        const response = await axiosInstance.post('/api/account/register', {
+            userName: userName.toLowerCase(),
+            email,
+            password,
+            firstName,
+            lastName
+        });
+        return response.data;
     } catch(error: unknown)
     {
         if(axios.isAxiosError(error) && error.response)
             {
                 throw new Error(
-                    error.response.data.message || 
+                    error.response.data.message ||
                     error.response.data[0]?.description ||  // Handles ASP.NET Identity error array
                     "Registration failed"
                 );
@@ -56,12 +76,7 @@ export const register = async (
 
 export const googleLogin = async () => {
     try {
-      //  const response = await axios.get("http://localhost:500/auth/google",{
-      //      withCredentials: true,
-      //  });
-        const response = await axios.get("http://localhost:5178/api/auth/google-response",{
-              withCredentials: true,
-          });
+        const response = await axiosInstance.get("/api/auth/google-response");
         return response.data;
     } catch(error: unknown) {
         if(error instanceof Error)
@@ -72,3 +87,60 @@ export const googleLogin = async () => {
             }
     }
 };
+
+export const getProfileInfo = async (username?: string) => {
+    try {
+        const response = await axiosInstance.get(`/api/account/users/${username}`);
+        return response.data;
+    } catch (error: unknown)
+    {
+        if(axios.isAxiosError(error) && error.response)
+            {
+                throw new Error(
+                    error.response.data.message ||
+                    error.response.data[0]?.description ||  // Handles ASP.NET Identity error array
+                    "Failed to fetch profile information"
+                );
+            } else {
+                throw new Error("Unknown Error")
+            }
+    }
+}
+
+export const getCurrentUser = async () => {
+    try {
+        const response = await axiosInstance.get('/api/account/me');
+        return response.data;
+    } catch (error: unknown) {
+        if (axios.isAxiosError(error) && error.response) {
+            // If 401, user is not authenticated
+            if (error.response.status === 401) {
+                return null;
+            }
+            throw new Error(
+                error.response.data.message ||
+                "Failed to fetch current user information"
+            );
+        } else {
+            throw new Error("Unknown Error");
+        }
+    }
+}
+
+export const logout = async (): Promise<void> => {
+    try {
+        // Call the logout endpoint on the backend
+        await axiosInstance.post('/api/account/logout');
+    } catch (error: unknown) {
+        if (axios.isAxiosError(error) && error.response) {
+            throw new Error(
+                error.response.data.message ||
+                "Failed to logout"
+            );
+        } else if (error instanceof Error) {
+            throw new Error(error.message || "Logout failed");
+        } else {
+            throw new Error("Unknown Error");
+        }
+    }
+}

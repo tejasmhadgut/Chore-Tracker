@@ -2,8 +2,8 @@ namespace ChoreTrackerAPI.Models
 {
     public enum ChoreStatus
     {
-        ToDo,
+        Todo,
         InProgress,
-        Completed
+        Done
     }
 }

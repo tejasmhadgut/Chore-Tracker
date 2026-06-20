@@ -1,72 +1,68 @@
 import axios from "axios";
+import { axiosInstance } from "./axiosConfig";
+import { errorHandler } from "./errorHandler";
 import { CardType } from "../components/types/types";
-
-const API_URL = 'http://localhost:5178/api/chores';
 
 export const getChoresByGroup = async (groupId: number) => {
     try {
-      const response = await axios.get(`${API_URL}/group/${groupId}`, {  withCredentials: true, });
+      const response = await axiosInstance.get(`/api/chores/group/${groupId}`);
       return response.data;
     } catch (error: unknown) {
-        if (axios.isAxiosError(error) && error.response) {
-            console.log("Axios error");
-            throw new Error(error.response.data?.message || "Error Fetching Group");
-        } else if (error instanceof Error) {
-            throw new Error(error.message || "Error Fetching Group");
-        } else {
-            throw new Error("Unknown Error");
-        }
+        const message = errorHandler.getUserFriendlyMessage(error, {
+          operation: 'fetching chores',
+          groupId: groupId
+        });
+        throw new Error(message);
     }
   };
 
 export const getChoreById = async (choreId: number) => {
     try {
-        const response = await axios.get(`${API_URL}/${choreId}`, {
-            withCredentials: true,
-        });
+        const response = await axiosInstance.get(`/api/chores/${choreId}`);
       return response.data;
     } catch (error: unknown) {
-        if (axios.isAxiosError(error) && error.response) {
-            console.log("Axios error");
-            throw new Error(error.response.data?.message || "Error Fetching Group");
-        } else if (error instanceof Error) {
-            throw new Error(error.message || "Error Fetching Group");
-        } else {
-            throw new Error("Unknown Error");
-        }
+        const message = errorHandler.getUserFriendlyMessage(error, {
+          operation: 'fetching chore',
+          choreId: choreId
+        });
+        throw new Error(message);
     }
   };
   
   export const updateChore = async (choreId: number, choreData: CardType) => {
     try {
-      const response = await axios.put(`${API_URL}/update/${choreId}`, choreData,{
-        withCredentials:true,
-      });
+      const response = await axiosInstance.put(`/api/chores/update/${choreId}`, choreData);
       return response.data;
     } catch (error: unknown) {
         if (axios.isAxiosError(error) && error.response) {
             console.log("Axios error");
             throw new Error(error.response.data?.message || "Error Updating Chore");
         } else if (error instanceof Error) {
-            throw new Error(error.message || "Error Fetching Group");
+            throw new Error(error.message || "Error Updating Chore");
         } else {
             throw new Error("Unknown Error");
         }
     }
   };
 
-  export const createChore = async ( choreData: CardType) => {
+  export const createChore = async (groupId: number, choreData: CardType) => {
     try {
-      const response = await axios.post(`${API_URL}/create`, choreData,{
-        withCredentials:true,
-      });
+        const payload = {
+            ...choreData,
+            // Convert string dates to JavaScript Date objects
+            recurrenceEndDate: choreData.recurrenceEndDate
+              ? new Date(choreData.recurrenceEndDate)
+              : null
+          };
+        const response = await axiosInstance.post(`/api/chores/${groupId}/create`, payload);
+
       return response.data;
     } catch (error: unknown) {
         if (axios.isAxiosError(error) && error.response) {
             console.log("Axios error");
-            throw new Error(error.response.data?.message || "Error Fetching Group");
+            throw new Error(error.response.data?.message || "Error Creating Chore");
         } else if (error instanceof Error) {
-            throw new Error(error.message || "Error Fetching Group");
+            throw new Error(error.message || "Error Creating Chore");
         } else {
             throw new Error("Unknown Error");
         }
@@ -75,16 +71,14 @@ export const getChoreById = async (choreId: number) => {
   
   export const deleteChore = async (choreId: number) => {
     try {
-      const response = await axios.delete(`${API_URL}/delete/${choreId}`,{
-        withCredentials:true,
-      });
+      const response = await axiosInstance.delete(`/api/chores/delete/${choreId}`);
       return response.data;
     } catch (error: unknown) {
         if (axios.isAxiosError(error) && error.response) {
             console.log("Axios error");
-            throw new Error(error.response.data?.message || "Error Fetching Group");
+            throw new Error(error.response.data?.message || "Error Deleting Chore");
         } else if (error instanceof Error) {
-            throw new Error(error.message || "Error Fetching Group");
+            throw new Error(error.message || "Error Deleting Chore");
         } else {
             throw new Error("Unknown Error");
         }
@@ -93,34 +87,30 @@ export const getChoreById = async (choreId: number) => {
 
   export const completeChore = async (choreId: number) => {
     try {
-      const response = await axios.patch(`${API_URL}/complete/${choreId}`,{
-        withCredentials:true,
-      });
+      const response = await axiosInstance.patch(`/api/chores/complete/${choreId}`);
       return response.data;
     } catch (error: unknown) {
         if (axios.isAxiosError(error) && error.response) {
             console.log("Axios error");
-            throw new Error(error.response.data?.message || "Error Fetching Group");
+            throw new Error(error.response.data?.message || "Error Completing Chore");
         } else if (error instanceof Error) {
-            throw new Error(error.message || "Error Fetching Group");
+            throw new Error(error.message || "Error Completing Chore");
         } else {
             throw new Error("Unknown Error");
         }
     }
   };
 
-  export const updateChoreStatus = async (choreId: number, status: string) => {
+  export const updateChoreStatus = async (choreId: number, status: number) => {
     try {
-      const response = await axios.put(`${API_URL}/update-status/${choreId}`, { status},
-        {withCredentials:true,
-       });
+      const response = await axiosInstance.put(`/api/chores/update-status/${choreId}`, status);
       return response.data;
     } catch (error: unknown) {
         if (axios.isAxiosError(error) && error.response) {
             console.log("Axios error");
-            throw new Error(error.response.data?.message || "Error Fetching Group");
+            throw new Error(error.response.data?.message || "Error Updating Chore Status");
         } else if (error instanceof Error) {
-            throw new Error(error.message || "Error Fetching Group");
+            throw new Error(error.message || "Error Updating Chore Status");
         } else {
             throw new Error("Unknown Error");
         }
@@ -129,17 +119,17 @@ export const getChoreById = async (choreId: number) => {
 
   export const getChoresByStatus = async (groupId: number, status: string) => {
     try {
-      const response = await axios.get(`${API_URL}/group/${groupId}/status/${status}`,
-        {withCredentials:true,}
-      );
+      const response = await axiosInstance.get(`/api/chores/group/${groupId}/status/${status}`);
+      console.log("bystatus");
+      console.log(response.data);
       return response.data;
-      
+
     } catch (error: unknown) {
         if (axios.isAxiosError(error) && error.response) {
             console.log("Axios error");
-            throw new Error(error.response.data?.message || "Error Fetching Group");
+            throw new Error(error.response.data?.message || "Error Fetching Chores by Status");
         } else if (error instanceof Error) {
-            throw new Error(error.message || "Error Fetching Group");
+            throw new Error(error.message || "Error Fetching Chores by Status");
         } else {
             throw new Error("Unknown Error");
         }
@@ -149,18 +139,17 @@ export const getChoreById = async (choreId: number) => {
   // Get completed chores by date range
   export const getCompletedChores = async (groupId: number, startDate: Date, endDate: Date) => {
     try {
-        const response = await axios.get(`${API_URL}/${groupId}/completed-chores`, {
+        const response = await axiosInstance.get(`/api/chores/${groupId}/completed-chores`, {
             params: { startDate, endDate },
-            withCredentials: true, // Move this inside the config object
           });
-    
+
       return response.data;
     } catch (error: unknown) {
         if (axios.isAxiosError(error) && error.response) {
             console.log("Axios error");
-            throw new Error(error.response.data?.message || "Error Fetching Group");
+            throw new Error(error.response.data?.message || "Error Fetching Completed Chores");
         } else if (error instanceof Error) {
-            throw new Error(error.message || "Error Fetching Group");
+            throw new Error(error.message || "Error Fetching Completed Chores");
         } else {
             throw new Error("Unknown Error");
         }

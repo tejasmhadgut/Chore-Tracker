@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: choretrack-config
+  namespace: choretrack
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:5000"
+  ConnectionStrings__Redis: "choretrack-redis:6379,abortConnect=false"
+  ConnectionStrings__RabbitMQ: "choretrack-rabbitmq"
+  RUN_BACKGROUND_JOBS: "false"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: choretrack-worker-config
+  namespace: choretrack
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:5000"
+  ConnectionStrings__Redis: "choretrack-redis:6379,abortConnect=false"
+  ConnectionStrings__RabbitMQ: "choretrack-rabbitmq"
+  RUN_BACKGROUND_JOBS: "true"

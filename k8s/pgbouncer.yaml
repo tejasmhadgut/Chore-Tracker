@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: choretrack-pgbouncer
+  namespace: choretrack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: choretrack-pgbouncer
+  template:
+    metadata:
+      labels:
+        app: choretrack-pgbouncer
+    spec:
+      containers:
+        - name: pgbouncer
+          image: edoburu/pgbouncer:latest
+          ports:
+            - containerPort: 5432
+          env:
+            - name: DB_HOST
+              value: choretrack-postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: postgres
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: choretrack-db-secret
+                  key: postgres-password
+            - name: DB_NAME
+              value: choretrack_db
+            - name: POOL_MODE
+              value: transaction
+            - name: DEFAULT_POOL_SIZE
+              value: "25"
+            - name: MAX_CLIENT_CONN
+              value: "200"
+            - name: IGNORE_STARTUP_PARAMETERS
+              value: extra_float_digits
+            - name: AUTH_TYPE
+              value: scram-sha-256
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: choretrack-pgbouncer
+  namespace: choretrack
+spec:
+  selector:
+    app: choretrack-pgbouncer
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: choretrack-pgbouncer-replica
+  namespace: choretrack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: choretrack-pgbouncer-replica
+  template:
+    metadata:
+      labels:
+        app: choretrack-pgbouncer-replica
+    spec:
+      containers:
+        - name: pgbouncer
+          image: edoburu/pgbouncer:latest
+          ports:
+            - containerPort: 5432
+          env:
+            - name: DB_HOST
+              value: choretrack-postgres-replica
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: postgres
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: choretrack-db-secret
+                  key: postgres-password
+            - name: DB_NAME
+              value: choretrack_db
+            - name: POOL_MODE
+              value: transaction
+            - name: DEFAULT_POOL_SIZE
+              value: "25"
+            - name: MAX_CLIENT_CONN
+              value: "200"
+            - name: IGNORE_STARTUP_PARAMETERS
+              value: extra_float_digits
+            - name: AUTH_TYPE
+              value: scram-sha-256
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: choretrack-pgbouncer-replica
+  namespace: choretrack
+spec:
+  selector:
+    app: choretrack-pgbouncer-replica
+  ports:
+    - port: 5432
+      targetPort: 5432

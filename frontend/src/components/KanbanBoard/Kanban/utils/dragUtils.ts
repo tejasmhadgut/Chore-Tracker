@@ -1,3 +1,5 @@
+import { StatusType } from "../../Types/CardTypes";
+
 export const getNearestIndicator = (e: React.DragEvent<HTMLDivElement>, indicators: HTMLElement[]) => {
     const DISTANCE_OFFSET=50;
     const el = indicators.reduce(
@@ -17,20 +19,26 @@ export const getNearestIndicator = (e: React.DragEvent<HTMLDivElement>, indicato
     );
     return el;
 }
-export const highlightIndicator = (e: React.DragEvent<HTMLDivElement>, column: string) => {
+export const highlightIndicator = (e: React.DragEvent<HTMLDivElement>, column: StatusType) => {
     const indicators = getIndicators(column);
     clearHighlights(column,indicators);
     const el = getNearestIndicator(e, indicators);
     el.element.style.opacity = "1";
+    el.element.style.setProperty('--drop-opacity', '1');
+    el.element.style.transform = 'scaleX(1)';
+    el.element.style.transition = 'all 0.2s ease-in-out';
 };
 
-export const clearHighlights = (column: string,els?: HTMLElement[]) => {
+export const clearHighlights = (column: StatusType,els?: HTMLElement[]) => {
     const indicators = els || getIndicators(column);
     indicators.forEach((i)=>{
         i.style.opacity = "0";
+        i.style.setProperty('--drop-opacity', '0');
+        i.style.transform = 'scaleX(0)';
+        i.style.transition = 'all 0.2s ease-in-out';
     })
 }
 
-export const getIndicators = (column: string) => {
+export const getIndicators = (column: StatusType) => {
     return Array.from(document.querySelectorAll(`[data-column="${column}"]`)) as HTMLElement[];
 }

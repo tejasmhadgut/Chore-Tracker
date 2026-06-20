@@ -1,13 +1,14 @@
 import React, { Dispatch, ReactNode, SetStateAction, useRef, useState } from 'react'
-import {  useLocation } from 'react-router-dom';
+import {  useLocation, Link } from 'react-router-dom';
 import { Position } from '../types/types';
 
-type PositionWithoutHeight = Omit<Position, "height">;
+type PositionWithoutHeightAndTop = Omit<Position, "height" | "top">;
+
 
 type TabProps = {
     children: ReactNode;
-    setPosition: Dispatch<SetStateAction<PositionWithoutHeight>>;
-    to: string;
+    setPosition: Dispatch<SetStateAction<PositionWithoutHeightAndTop>>;
+    to?: string;
     onClick?: () => void;
 }
 
@@ -25,10 +26,10 @@ const Tab: React.FC<TabProps> = ({ children, setPosition, to, onClick }) => {
         }}
         onClick={onClick}
         onMouseLeave={()=> setHovered(false)}
-    className={`relative z-1 block cursor-pointer px-1 py-1 text-xs  md:px-4 md:py-4 md:text-base ${hovered? 'text-gray-300  delay-100': 'text-black'} `}
+    className="relative z-1 block cursor-pointer px-3 py-1.5 rounded-md transition-colors text-sm"
     >
         
-        {isActive ? children: <a href={to} >{children}</a>}
+        {isActive ? children: <Link to={to || "#"} >{children}</Link>}
        
     </li>
   )

@@ -1,9 +1,12 @@
 import React, { useState } from 'react'
+import { motion } from 'framer-motion';
 import {  ChoreCardType,  StatusType } from '../Types/CardTypes';
 import Card from './Card';
 import AddCard from './AddCard';
 import { clearHighlights, getIndicators, getNearestIndicator, highlightIndicator } from './utils/dragUtils';
 import DropIndicator from './DropIndicator';
+import { updateChoreStatus } from '../../../services/ChoreService';
+import confetti from 'canvas-confetti';
 
 type ColumnProps = {
     title: string;
@@ -30,7 +33,7 @@ const Column = (
         setActive(false);
         clearHighlights(status);
     }
-    const handleDragEnd = (e:React.DragEvent<HTMLDivElement>) => {
+    const handleDragEnd = async (e:React.DragEvent<HTMLDivElement>) => {
         setActive(false);
         clearHighlights(status);
         const cardId = e.dataTransfer?.getData("cardId");
@@ -42,37 +45,62 @@ const Column = (
             let cardToTransfer = copy.find((c)=>c.id===parseInt(cardId));
             if(!cardToTransfer) return;
             cardToTransfer = {...cardToTransfer, status};
-            copy = copy.filter((c)=> c.id !== parseInt(cardId));
-            const moveToBack = before === "-1";
-            if(moveToBack) {
-                copy.push(cardToTransfer);
-            }else{
-                const insertAtIndex = copy.findIndex((el)=>el.id === parseInt(before));
-                if(insertAtIndex===undefined) return;
-                copy.splice(insertAtIndex, 0, cardToTransfer);
+            try{
+                console.log("cardToTransfer.id = "+cardToTransfer.id);
+                console.log("statusMap[status] = "+status);
+                await updateChoreStatus(cardToTransfer.id, status);
+                copy = copy.filter((c)=> c.id !== parseInt(cardId));
+                const moveToBack = before === "-1";
+                if(moveToBack) {
+                    copy.push(cardToTransfer);
+                }else{
+                    const insertAtIndex = copy.findIndex((el)=>el.id === parseInt(before));
+                    if(insertAtIndex===undefined) return;
+                    copy.splice(insertAtIndex, 0, cardToTransfer);
+
+                }
+                setCards(copy);
+
+                // Trigger confetti celebration when chore is marked as done
+                if(status === StatusType.done) {
+                    confetti({
+                        particleCount: 100,
+                        spread: 70,
+                        origin: { y: 0.6 },
+                        colors: ['#06b6d4', '#0891b2', '#0e7490']
+                    });
+                }
+            } catch(error){
+                console.error("Failed to update card status", error);
             }
-            setCards(copy);
+   
         }
     }
-    
-    
-    
-
-    
 
   return (
     <div className='w-56 shrink-0'>
-        <div className='mb-3 flex items-center justify-between'>
-            <h3 className={`font medium ${headingColor}`}>{title}</h3>
-            <span className='rounded text-sm text-neutral-400'>{filteredCards.length}</span>
+        <div className='mb-3 flex items-center justify-around px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700 border-t-2 border-t-cyan-500'>
+            <h3 className={`font-bold ${headingColor}`}>{title}</h3>
+            <span className='rounded-full text-sm text-cyan-300 bg-cyan-600/20 px-2.5 py-0.5 font-semibold'>{filteredCards.length}</span>
         </div>
-        <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDragEnd} className={`h-full w-full transition-colors ${active ? "bg-neutral-800/50" : "bg-neutral-800/0"}`}>
+        <motion.div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDragEnd}
+        animate={{
+          backgroundColor: active ? "rgba(34, 211, 238, 0.1)" : "rgba(0, 0, 0, 0)",
+          borderColor: active ? "rgba(34, 211, 238, 0.7)" : "transparent",
+        }}
+        transition={{ duration: 0.2 }}
+        className={`h-full w-full rounded-lg ${active ? "border-2 shadow-lg shadow-cyan-500/10" : "border border-transparent"}`}
+        style={{minHeight: filteredCards.length > 0 ? "auto":"200px"}}>
         {filteredCards.map((c)=> {
+
             return <Card key={c.id} {...c} handleDragStart={handleDragStart}/>
         })}
         <DropIndicator beforeId="-1" status={status} />
         <AddCard status={status} setCards={setCards} />
-        </div>
+        </motion.div>
         </div>
   )
 }

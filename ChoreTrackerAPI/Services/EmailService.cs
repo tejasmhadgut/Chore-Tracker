@@ -31,7 +31,7 @@ namespace ChoreTrackerAPI.Services
             Console.WriteLine("from email"+from);
             Console.WriteLine("to email"+to);
             var msg = MailHelper.CreateSingleEmail(from, to, subject, plainTextContent, htmlContent);
-
+            Console.WriteLine("ttil here");
             var response = await client.SendEmailAsync(msg);
             if (response.StatusCode != System.Net.HttpStatusCode.Accepted)
             {
